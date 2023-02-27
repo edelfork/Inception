@@ -1,0 +1,167 @@
+version: '3'
+services:
+
+    nginx:
+        image: nginx
+        build: requirements/nginx/
+        container_name: nginx
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - logs:/var/log/custom_logs
+        volumes_from:
+            - wordpress
+        depends_on:
+            - cgit
+        networks:
+            - frontend
+        restart: always
+    
+    wordpress:
+        image: wordpress
+        build: requirements/wordpress/
+        container_name: wordpress
+        ports:
+            - "9000:9000"
+        volumes:
+            - website:/var/www/html
+        networks:
+            - frontend
+            - backend
+        depends_on:
+            - mariadb
+            - redis
+        restart: always
+        environment:
+            DB_HOSTNAME: ${DB_HOSTNAME}
+            DOMAIN_NAME: ${DOMAIN_NAME}
+            DATABASE_NAME: ${DATABASE_NAME}
+            DATABASE_ADMIN: ${DATABASE_ADMIN}
+            DATABASE_ADMIN_PWD: ${DATABASE_ADMIN_PWD}
+            WP_ADMIN_USR: ${WP_ADMIN_USR}
+            WP_ADMIN_PWD: ${WP_ADMIN_PWD}
+            WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+            WP_USR: ${WP_USR}
+            WP_PWD: ${WP_PWD}
+            WP_EMAIL: ${WP_EMAIL}
+            REDIS_HOSTNAME: ${REDIS_HOSTNAME}
+            REDIS_PWD: ${REDIS_PWD}
+
+        
+    mariadb:
+        image: mariadb
+        build: requirements/mariadb/
+        container_name: mariadb
+        ports:
+            - "3306:3306"
+        volumes:
+            - wp_database:/var/lib/mysql/
+        networks:
+            - backend
+        restart: always
+        environment:
+            DB_ROOT_PWD: ${DB_ROOT_PWD}
+            DATABASE_NAME: ${DATABASE_NAME}
+            DATABASE_ADMIN: ${DATABASE_ADMIN}
+            DATABASE_ADMIN_PWD: ${DATABASE_ADMIN_PWD}
+
+
+    ftp:
+        image: ftp
+        build: requirements/bonus/ftp
+        container_name: ftp
+        ports:
+            - "21:21"
+            - "65100-65200:65100-65200"
+        depends_on:
+            - nginx
+        volumes_from:
+            - nginx
+        networks:
+            - backend
+        restart: always
+        environment:
+            FTP_USER: ${FTP_USER}
+            FTP_PWD: ${FTP_PWD}
+
+    
+    redis:
+        image: redis
+        build: requirements/bonus/redis
+        container_name: redis
+        ports:
+            - "6379:6379"
+        networks:
+            - backend
+        restart: always
+        environment:
+            REDIS_PWD: ${REDIS_PWD}
+
+
+    adminer:
+        image: adminer
+        build: requirements/bonus/adminer
+        container_name: adminer
+        volumes_from:
+            - wordpress
+        depends_on:
+            - wordpress
+        networks:
+            - backend
+        restart: always
+
+    
+    cgit:
+        image: cgit
+        build: requirements/bonus/cgit
+        container_name: cgit
+        volumes_from:
+            - wordpress
+        volumes:
+            - repositories:/var/git/
+        depends_on:
+            - wordpress
+        networks:
+            - frontend
+            - backend
+        ports:
+            - "1234:1234"
+        restart: always
+        environment:
+            GIT_PWD: ${GIT_PWD}
+
+
+networks:
+    frontend:
+    backend:
+
+volumes:
+    website:
+        driver: local
+        name: website
+        driver_opts:
+            type: none
+            o: bind
+            device: /home/gimartin/data/website
+    wp_database:
+        driver: local
+        name: wp_database
+        driver_opts:
+            type: none
+            o: bind
+            device: /home/gimartin/data/wp_database
+    logs:
+        driver: local
+        name: logs
+        driver_opts:
+            type: none
+            o: bind
+            device: /home/gimartin/data/logs
+    repositories:
+        driver: local
+        name: repositories
+        driver_opts:
+            type: none
+            o: bind
+            device: /home/gimartin/data/repositories
